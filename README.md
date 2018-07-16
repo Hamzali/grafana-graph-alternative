@@ -2,7 +2,7 @@
 
 Add experimental features into the Grafana's default panel.
 
-## Feature
+## Features
 
 ### Y-Axis Label Mapping
 
