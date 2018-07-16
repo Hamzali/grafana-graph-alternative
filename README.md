@@ -29,4 +29,6 @@ See the following page for more details.
 
 * [grafana](https://github.com/grafana/grafana)
 * [grafana-graph-panel](https://github.com/CorpGlory/grafana-graph-panel) 
+* [grafana-plugin-template-webpack-typescript](https://github.com/CorpGlory/grafana-plugin-template-webpack-typescript) 
+* [@types/grafana](https://github.com/CorpGlory/types-grafana)
 * [flot](https://github.com/flot/flot)
