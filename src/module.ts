@@ -40,6 +40,8 @@ class GraphCtrl extends MetricsPanelCtrl {
         min: null,
         max: null,
         format: 'short',
+        labelMappings: [],
+        mappedLabelOnly: false,
       },
       {
         label: null,
@@ -48,6 +50,8 @@ class GraphCtrl extends MetricsPanelCtrl {
         min: null,
         max: null,
         format: 'short',
+        labelMappings: [],
+        mappedLabelOnly: false,
       },
     ],
     xaxis: {
@@ -56,6 +60,10 @@ class GraphCtrl extends MetricsPanelCtrl {
       name: null,
       values: [],
       buckets: null,
+    },
+    yaxis: {
+      align: false,
+      alignLevel: null,
     },
     // show/hide lines
     lines: true,
@@ -114,7 +122,7 @@ class GraphCtrl extends MetricsPanelCtrl {
   /** @ngInject */
   constructor($scope, $injector, private annotationsSrv) {
     super($scope, $injector);
-    
+
     _.defaults(this.panel, this.panelDefaults);
     _.defaults(this.panel.tooltip, this.panelDefaults.tooltip);
     _.defaults(this.panel.legend, this.panelDefaults.legend);
@@ -234,7 +242,7 @@ class GraphCtrl extends MetricsPanelCtrl {
   }
 
   changeSeriesColor(series, color) {
-    series.color = color;
+    series.setColor(color);
     this.panel.aliasColors[series.alias] = series.color;
     this.render();
   }

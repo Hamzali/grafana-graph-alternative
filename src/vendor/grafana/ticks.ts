@@ -1,5 +1,3 @@
-import { getDataMinMax } from './time_series2';
-
 /**
  * Calculate tick step.
  * Implementation from d3-array (ticks.js)
@@ -121,12 +119,10 @@ export function getFlotRange(panelMin, panelMax, datamin, datamax) {
  * Calculate tick decimals.
  * Implementation from Flot.
  */
-export function getFlotTickDecimals(data, axis) {
-  let { datamin, datamax } = getDataMinMax(data);
-  let { min, max } = getFlotRange(axis.min, axis.max, datamin, datamax);
-  let noTicks = 3;
-  let tickDecimals, maxDec;
-  let delta = (max - min) / noTicks;
+export function getFlotTickDecimals(datamin, datamax, axis, height) {
+  const { min, max } = getFlotRange(axis.min, axis.max, datamin, datamax);
+  const noTicks = 0.3 * Math.sqrt(height);
+  const delta = (max - min) / noTicks;
   let dec = -Math.floor(Math.log(delta) / Math.LN10);
 
   let magn = Math.pow(10, -dec);
@@ -139,20 +135,76 @@ export function getFlotTickDecimals(data, axis) {
   } else if (norm < 3) {
     size = 2;
     // special case for 2.5, requires an extra decimal
-    if (norm > 2.25 && (maxDec == null || dec + 1 <= maxDec)) {
+    if (norm > 2.25) {
       size = 2.5;
-      ++dec;
     }
   } else if (norm < 7.5) {
     size = 5;
   } else {
     size = 10;
   }
-
   size *= magn;
 
-  tickDecimals = Math.max(0, maxDec != null ? maxDec : dec);
+  const tickDecimals = Math.max(0, -Math.floor(Math.log(delta) / Math.LN10) + 1);
   // grafana addition
   const scaledDecimals = tickDecimals - Math.floor(Math.log(size) / Math.LN10);
   return { tickDecimals, scaledDecimals };
+}
+
+/**
+ * Format timestamp similar to Grafana graph panel.
+ * @param ticks Number of ticks
+ * @param min Time from (in milliseconds)
+ * @param max Time to (in milliseconds)
+ */
+export function grafanaTimeFormat(ticks, min, max) {
+  if (min && max && ticks) {
+    let range = max - min;
+    let secPerTick = range / ticks / 1000;
+    let oneDay = 86400000;
+    let oneYear = 31536000000;
+
+    if (secPerTick <= 45) {
+      return '%H:%M:%S';
+    }
+    if (secPerTick <= 7200 || range <= oneDay) {
+      return '%H:%M';
+    }
+    if (secPerTick <= 80000) {
+      return '%m/%d %H:%M';
+    }
+    if (secPerTick <= 2419200 || range <= oneYear) {
+      return '%m/%d';
+    }
+    return '%Y-%m';
+  }
+
+  return '%H:%M';
+}
+
+/**
+ * Logarithm of value for arbitrary base.
+ */
+export function logp(value, base) {
+  return Math.log(value) / Math.log(base);
+}
+
+/**
+ * Get decimal precision of number (3.14 => 2)
+ */
+export function getPrecision(num: number): number {
+  let str = num.toString();
+  return getStringPrecision(str);
+}
+
+/**
+ * Get decimal precision of number stored as a string ("3.14" => 2)
+ */
+export function getStringPrecision(num: string): number {
+  let dot_index = num.indexOf('.');
+  if (dot_index === -1) {
+    return 0;
+  } else {
+    return num.length - dot_index - 1;
+  }
 }

@@ -11,14 +11,15 @@ import { EventManager } from './vendor/grafana/event_manager';
 import { updateLegendValues } from './vendor/grafana/time_series2';
 import { tickStep } from './vendor/grafana/ticks';
 
-import * as $ from 'jquery';
+import $ from 'jquery';
 import _ from 'lodash';
 import moment from 'moment';
 import kbn from 'grafana/app/core/utils/kbn';
 import { appEvents, coreModule } from 'grafana/app/core/core';
 import GraphTooltip from './graph_tooltip';
 import { ThresholdManager } from './threshold_manager';
-import { convertValuesToHistogram, getSeriesValues } from './histogram';
+import { convertToHistogramData } from './histogram';
+import { alignYLevel } from './align_yaxes';
 
 /** @ngInject **/
 function graphDirective(timeSrv, popoverSrv, contextSrv) {
@@ -63,7 +64,8 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         }
         annotations = ctrl.annotations || [];
         buildFlotPairs(data);
-        updateLegendValues(data, panel);
+        const graphHeight = elem.height();
+        updateLegendValues(data, panel, graphHeight);
 
         ctrl.events.emit('render-legend');
       });
@@ -155,6 +157,16 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         }
       }
 
+      function processRangeHook(plot) {
+        var yAxes = plot.getYAxes();
+        const align = panel.yaxis.align || false;
+
+        if (yAxes.length > 1 && align === true) {
+          const level = panel.yaxis.alignLevel || 0;
+          alignYLevel(yAxes, parseFloat(level));
+        }
+      }
+
       // Series could have different timeSteps,
       // let's find the smallest one so that bars are correctly rendered.
       // In addition, only take series which are rendered as bars for this.
@@ -236,16 +248,14 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
           }
           case 'histogram': {
             let bucketSize: number;
-            let values = getSeriesValues(data);
 
-            if (data.length && values.length) {
+            if (data.length) {
               let histMin = _.min(_.map(data, (s:any) => s.stats.min));
               let histMax = _.max(_.map(data, (s:any) => s.stats.max));
               let ticks = panel.xaxis.buckets || panelWidth / 50;
               bucketSize = tickStep(histMin, histMax, ticks);
-              let histogram = convertValuesToHistogram(values, bucketSize);
-              data[0].data = histogram;
               options.series.bars.barWidth = bucketSize * 0.8;
+              data = convertToHistogramData(data, bucketSize, ctrl.hiddenSeries, histMin, histMax);
             } else {
               bucketSize = 0;
             }
@@ -287,11 +297,14 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
       }
 
       function buildFlotOptions(panel) {
+        let gridColor = '#c8c8c8';
+        // let gridColor = '#a1a1a1';
         const stack = panel.stack ? true : null;
         let options = {
           hooks: {
             draw: [drawHook],
             processOffset: [processOffsetHook],
+            processRange: [processRangeHook],
           },
           legend: { show: false },
           series: {
@@ -333,7 +346,7 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
             borderWidth: 0,
             hoverable: true,
             clickable: true,
-            color: '#c8c8c8',
+            color: gridColor,
             margin: { left: 0, right: 0 },
             labelMarginX: 0,
           },
@@ -351,33 +364,16 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
       function sortSeries(series, panel) {
         var sortBy = panel.legend.sort;
         var sortOrder = panel.legend.sortDesc;
-        var haveSortBy = sortBy !== null || sortBy !== undefined;
-        var haveSortOrder = sortOrder !== null || sortOrder !== undefined;
+        var haveSortBy = sortBy !== null && sortBy !== undefined;
+        var haveSortOrder = sortOrder !== null && sortOrder !== undefined;
         var shouldSortBy = panel.stack && haveSortBy && haveSortOrder;
         var sortDesc = panel.legend.sortDesc === true ? -1 : 1;
 
-        series.sort((x, y) => {
-          if (x.zindex > y.zindex) {
-            return 1;
-          }
-
-          if (x.zindex < y.zindex) {
-            return -1;
-          }
-
-          if (shouldSortBy) {
-            if (x.stats[sortBy] > y.stats[sortBy]) {
-              return 1 * sortDesc;
-            }
-            if (x.stats[sortBy] < y.stats[sortBy]) {
-              return -1 * sortDesc;
-            }
-          }
-
-          return 0;
-        });
-
-        return series;
+        if (shouldSortBy) {
+          return _.sortBy(series, s => s.stats[sortBy] * sortDesc);
+        } else {
+          return _.sortBy(series, s => s.zindex);
+        }
       }
 
       function translateFillOption(fill) {
@@ -426,7 +422,13 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         let defaultTicks = panelWidth / 50;
 
         if (data.length && bucketSize) {
-          ticks = _.map(data[0].data, point => point[0]);
+          let tick_values = [];
+          for (let d of data) {
+            for (let point of d.data) {
+              tick_values[point[0]] = true;
+            }
+          }
+          ticks = Object.keys(tick_values).map(v => Number(v));
           min = _.min(ticks);
           max = _.max(ticks);
 
@@ -440,7 +442,8 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
 
           // Expand ticks for pretty view
           min = Math.floor(min / tickStep) * tickStep;
-          max = Math.ceil(max / tickStep) * tickStep;
+          // 1.01 is 101% - ensure we have enough space for last bar
+          max = Math.ceil(max * 1.01 / tickStep) * tickStep;
 
           ticks = [];
           for (let i = min; i <= max; i += tickStep) {
@@ -512,10 +515,20 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
           options.yaxes.push(secondY);
 
           applyLogScale(options.yaxes[1], data);
-          configureAxisMode(options.yaxes[1], panel.percentage && panel.stack ? 'percent' : panel.yaxes[1].format);
+          configureAxisMode(
+            options.yaxes[1],
+            panel.percentage && panel.stack ? 'percent' : panel.yaxes[1].format,
+            panel.yaxes[1].labelMappings,
+            panel.yaxes[1].mappedLabelOnly
+          );
         }
         applyLogScale(options.yaxes[0], data);
-        configureAxisMode(options.yaxes[0], panel.percentage && panel.stack ? 'percent' : panel.yaxes[0].format);
+        configureAxisMode(
+          options.yaxes[0],
+          panel.percentage && panel.stack ? 'percent' : panel.yaxes[0].format,
+          panel.yaxes[0].labelMappings,
+          panel.yaxes[0].mappedLabelOnly
+        );
       }
 
       function parseNumber(value: any) {
@@ -629,10 +642,30 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         return ticks;
       }
 
-      function configureAxisMode(axis, format) {
+      function configureAxisMode(axis, format, labelMappings = [], mappedLabelOnly = false) {
         axis.tickFormatter = function(val, axis) {
-          return kbn.valueFormats[format](val, axis.tickDecimals, axis.scaledDecimals);
+          if (!kbn.valueFormats[format]) {
+            throw new Error(`Unit '${format}' is not supported`);
+          }
+
+          const mappedLabel = getMappedAxisLabel(val, labelMappings);
+          if (mappedLabel) {
+            return mappedLabel;
+          }
+
+          return mappedLabelOnly ? '' : kbn.valueFormats[format](val, axis.tickDecimals, axis.scaledDecimals);
         };
+      }
+
+      function getMappedAxisLabel(val, labelMappings) {
+        for (let i = 0; i < labelMappings.length; i++) {
+          const from = labelMappings[i].value;
+          const to = labelMappings[i].label;
+          if (val === from && to) {
+            return to;
+          }
+        }
+        return null;
       }
 
       function time_format(ticks, min, max) {
@@ -667,7 +700,7 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
           return;
         }
 
-        if ((ranges.ctrlKey || ranges.metaKey) && contextSrv.isEditor) {
+        if ((ranges.ctrlKey || ranges.metaKey) && (dashboard.meta.canEdit || dashboard.meta.canMakeEditable)) {
           // Add annotation
           setTimeout(() => {
             eventManager.updateTime(ranges.xaxis);
@@ -688,7 +721,7 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
           return;
         }
 
-        if ((pos.ctrlKey || pos.metaKey) && contextSrv.isEditor) {
+        if ((pos.ctrlKey || pos.metaKey) && (dashboard.meta.canEdit || dashboard.meta.canMakeEditable)) {
           // Skip if range selected (added in "plotselected" event handler)
           let isRangeSelection = pos.x !== pos.x1;
           if (!isRangeSelection) {
