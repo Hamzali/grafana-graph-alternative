@@ -2,6 +2,13 @@
 
 Add experimental features into the Grafana's default panel.
 
+## Feature
+
+### Y-Axis Label Mapping
+
+![Screen](https://raw.githubusercontent.com/wiki/nmaniwa/grafana-graph-alternative/features/y-axis-label-mapping/images/overview.png)
+![Setting](https://raw.githubusercontent.com/wiki/nmaniwa/grafana-graph-alternative/features/y-axis-label-mapping/images/setting.png)
+
 # How to Build
 
 ```
