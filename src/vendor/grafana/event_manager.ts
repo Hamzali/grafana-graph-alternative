@@ -4,18 +4,18 @@ import tinycolor from 'tinycolor2';
 import { MetricsPanelCtrl } from 'grafana/app/plugins/sdk';
 import { AnnotationEvent } from './event';
 import {
-  DEFAULT_ANNOTATION_COLOR,
   OK_COLOR,
   ALERTING_COLOR,
   NO_DATA_COLOR,
-  REGION_FILL_ALPHA
+  DEFAULT_ANNOTATION_COLOR,
+  REGION_FILL_ALPHA,
 } from './colors';
 
 export class EventManager {
   event: AnnotationEvent;
   editorOpen: boolean;
 
-  constructor(private panelCtrl: MetricsPanelCtrl) { }
+  constructor(private panelCtrl: MetricsPanelCtrl) {}
 
   editorClosed() {
     this.event = null;

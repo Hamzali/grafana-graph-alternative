@@ -3,7 +3,9 @@ var template = `
   <div class="graph-panel__chart" grafana-graph-alternative ng-dblclick="ctrl.zoomOut()">
   </div>
 
-  <div class="graph-legend" graph-legend-alternative></div>
+  <div class="graph-legend">
+    <div class="graph-legend-content" graph-legend-alternative></div>
+  </div>
 </div>
 `;
 

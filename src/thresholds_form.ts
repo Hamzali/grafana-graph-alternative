@@ -29,6 +29,7 @@ export class ThresholdFormCtrl {
       op: 'gt',
       fill: true,
       line: true,
+      yaxis: 'left',
     });
     this.panelCtrl.render();
   }
@@ -110,6 +111,16 @@ var template = `
       </div>
 
       <div class="gf-form">
+        <label class="gf-form-label">Y-Axis</label>
+        <div class="gf-form-select-wrapper">
+          <select class="gf-form-input" ng-model="threshold.yaxis"
+                  ng-init="threshold.yaxis = threshold.yaxis === 'left' || threshold.yaxis === 'right' ? threshold.yaxis : 'left'"
+                  ng-options="f for f in ['left', 'right']" ng-change="ctrl.render()" ng-disabled="ctrl.disabled">
+          </select>
+        </div>
+      </div>
+
+      <div class="gf-form">
         <label class="gf-form-label">
           <a class="pointer" ng-click="ctrl.removeThreshold($index)" ng-disabled="ctrl.disabled">
             <i class="fa fa-trash"></i>
@@ -127,7 +138,7 @@ var template = `
 </div>
 `;
 
-coreModule.directive('graphPanelThresholdForm', function() {
+coreModule.directive('graphThresholdFormAlternative', function() {
   return {
     restrict: 'E',
     template: template,
