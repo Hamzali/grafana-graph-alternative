@@ -9,6 +9,7 @@ import config from 'grafana/app/core/config';
 import { MetricsPanelCtrl, alertTab } from 'grafana/app/plugins/sdk';
 import { DataProcessor } from './data_processor';
 import { axesEditorComponent } from './axes_editor';
+import { tabDisplayComponent } from './tab_display';
 
 class GraphCtrl extends MetricsPanelCtrl {
   static template = template;
@@ -142,7 +143,8 @@ class GraphCtrl extends MetricsPanelCtrl {
     var partialPath = this.panelPath + 'partials';
     this.addEditorTab('Axes', axesEditorComponent, 2);
     this.addEditorTab('Legend', `${partialPath}/tab_legend.html`, 3);
-    this.addEditorTab('Display', `${partialPath}/tab_display.html`, 4);
+    // this.addEditorTab('Display', `${partialPath}/tab_display.html`, 4);
+    this.addEditorTab('Display', tabDisplayComponent, 4);
 
     if (config.alertingEnabled) {
       this.addEditorTab('Alert', alertTab, 5);
